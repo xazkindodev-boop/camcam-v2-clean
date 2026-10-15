@@ -17,7 +17,6 @@ import androidx.media3.transformer.Effects
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.Transformer
-import com.zkincamcam.xcam.core.capture.LivenessMotionEffect
 import com.zkincamcam.xcam.core.capture.LivenessConfig
 import com.zkincamcam.xcam.core.capture.DeepLivenessShader
 import com.zkincamcam.xcam.core.capture.FaceLandmarkAnalyzer
@@ -86,7 +85,6 @@ object MediaConverter {
             }
             val mediaItem = mediaItemBuilder.build()
             val videoEffects = mutableListOf<Effect>()
-            if (config.eyeMovementEnabled) videoEffects.add(LivenessMotionEffect())
             videoEffects.add(
                 DeepLivenessShader(
                     landmarks,
@@ -100,6 +98,7 @@ object MediaConverter {
                     config.beautyPreset,
                     config.catchlightOverride,
                     config.hdLevel,
+                    config.eyeMovementEnabled,
                 )
             )
 

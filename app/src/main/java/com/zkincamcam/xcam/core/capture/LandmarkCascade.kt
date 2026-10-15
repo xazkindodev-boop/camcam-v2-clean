@@ -27,7 +27,23 @@ object LandmarkCascade {
             meshIndices = null,
             faceCenterX = 0.5f,
             faceCenterY = 0.42f,
-            faceRollDegrees = 0f
+            faceRollDegrees = 0f,
+            eyeLandmarksDetected = false
+        )
+
+    fun faceBoxOnly(
+        faceCenterX: Float,
+        faceCenterY: Float,
+    ): FaceLandmarkAnalyzer.EyeLandmarks =
+        FaceLandmarkAnalyzer.EyeLandmarks(
+            leftEyeX = 0.44f,
+            leftEyeY = 0.40f,
+            rightEyeX = 0.56f,
+            rightEyeY = 0.40f,
+            detected = true,
+            faceCenterX = faceCenterX,
+            faceCenterY = faceCenterY,
+            eyeLandmarksDetected = false,
         )
 
     /** Tier 1 (mesh) wins when detected; else tier 2; else [degraded]. */

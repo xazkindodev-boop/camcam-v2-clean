@@ -43,7 +43,8 @@ object FaceLandmarkAnalyzer {
         val meshIndices: IntArray? = null,
         val faceCenterX: Float = 0.5f,
         val faceCenterY: Float = 0.5f,
-        val faceRollDegrees: Float = 0f
+        val faceRollDegrees: Float = 0f,
+        val eyeLandmarksDetected: Boolean = detected,
     )
 
     /**
@@ -324,16 +325,12 @@ object FaceLandmarkAnalyzer {
                     meshIndices = null,
                     faceCenterX = centerX,
                     faceCenterY = centerY,
-                    faceRollDegrees = roll
+                    faceRollDegrees = roll,
+                    eyeLandmarksDetected = true
                 )
             } else {
                 // Box only — centre is still better than the degraded guess.
-                EyeLandmarks(
-                    0.44f, 0.40f, 0.56f, 0.40f,
-                    detected = true,
-                    faceCenterX = centerX,
-                    faceCenterY = centerY
-                )
+                LandmarkCascade.faceBoxOnly(centerX, centerY)
             }
         } catch (e: Exception) {
             Log.w(TAG, "tier2 face-detect error: ${e.message} -> tier3 degraded")

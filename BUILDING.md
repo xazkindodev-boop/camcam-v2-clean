@@ -143,7 +143,18 @@ Atau env: `APP_VERSION_CODE=2 APP_VERSION_NAME=1.1`.
 ```
 Tes membuat fixture audio/video lokal, menjalankan remux melewati batas loop, lalu
 memeriksa track, durasi, dan offset awal audio/video. Hasil tetap bergantung pada codec
-perangkat.
+perangkat. Suite juga mengompilasi shader GLES di perangkat dan memastikan matriks
+animasi preview/ekspor tetap sesuai dengan komposisi OpenGL Android.
+
+Tes deteksi wajah opsional membaca `landmark-sample.jpg` dari external-files xCam.
+Stage foto contoh di sana sebelum menjalankan tes untuk menguji foto asli dan versi
+yang sengaja diburamkan:
+```powershell
+adb push "C:\path\to\sample.jpg" /sdcard/Android/data/com.zkincamcam.xcam/files/landmark-sample.jpg
+.\gradlew.bat connectedDebugAndroidTest --no-daemon
+```
+Tes mencatat skor ketajaman dan hasil mesh; bila file contoh tidak tersedia, kedua
+tes sampel dilewati. Foto perangkat asli tidak diubah.
 
 ### Satu class test spesifik
 ```bash

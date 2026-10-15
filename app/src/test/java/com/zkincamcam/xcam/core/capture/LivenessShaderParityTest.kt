@@ -20,6 +20,7 @@ class LivenessShaderParityTest {
             "u_exposure", "u_contrast", "u_highlights", "u_shadows",
             "u_temperature", "u_tint", "u_saturation",
             "u_noise_intensity", "u_pulse_intensity", "u_use_lut",
+            "u_eye_landmarks_detected",
         )) {
             assertTrue("missing uniform $u", fs.contains("uniform float $u;") || fs.contains("uniform vec2 $u;"))
         }
@@ -29,6 +30,13 @@ class LivenessShaderParityTest {
     fun fragmentHasBeautyAndCatchlightPasses() {
         assertTrue(fs.contains("applyBeauty"))
         assertTrue(fs.contains("enhanceEyeLiveliness"))
+    }
+
+    @Test
+    fun eyeSpecificEffectsRequireDetectedEyeLandmarks() {
+        assertTrue(LivenessShaders.VERTEX.contains("u_eye_landmarks_detected > 0.5"))
+        assertTrue(fs.contains("u_eye_landmarks_detected < 0.5"))
+        assertTrue(fs.contains("u_eye_landmarks_detected > 0.5"))
     }
 
     @Test

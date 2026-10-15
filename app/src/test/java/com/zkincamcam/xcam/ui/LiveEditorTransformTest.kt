@@ -4,6 +4,15 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class LiveEditorTransformTest {
+    private fun transformedPivot(matrix: FloatArray, pivotX: Float, pivotY: Float): Pair<Float, Float> {
+        val clipX = pivotX * 2f - 1f
+        val clipY = 1f - pivotY * 2f
+        return Pair(
+            matrix[0] * clipX + matrix[4] * clipY + matrix[12],
+            matrix[1] * clipX + matrix[5] * clipY + matrix[13],
+        )
+    }
+
     @Test
     fun offCenterFaceStaysWhereItIs() {
         // Pivot semantics (post eye-pivot fix): the face centre is the anchor
@@ -45,6 +54,66 @@ class LiveEditorTransformTest {
         val y = matrix[1] * cx + matrix[5] * cy + matrix[13]
         assertEquals(cx, x, 0.0001f)
         assertEquals(cy, y, 0.0001f)
+    }
+
+    @Test
+    fun autoCenterMovesOffCenterEyePivotToFrameCenter() {
+        val matrix = LiveEditorTransform.buildMatrix(
+            faceCenterX = 0.7f,
+            faceCenterY = 0.3f,
+            scale = 1f,
+            translateX = 0f,
+            translateY = 0f,
+            rotationDegrees = 0f,
+            mirrored = false,
+            pivotX = 0.6f,
+            pivotY = 0.35f,
+            centerPivot = true,
+        )
+
+        val centered = transformedPivot(matrix, 0.6f, 0.35f)
+        assertEquals(0f, centered.first, 0.0001f)
+        assertEquals(0f, centered.second, 0.0001f)
+    }
+
+    @Test
+    fun autoCenterKeepsEyesCenteredAcrossRotationZoomMirrorAndManualOffset() {
+        val matrix = LiveEditorTransform.buildMatrix(
+            faceCenterX = 0.7f,
+            faceCenterY = 0.3f,
+            scale = 2.4f,
+            translateX = 0.12f,
+            translateY = -0.08f,
+            rotationDegrees = 37f,
+            mirrored = true,
+            autoLevelDegrees = -12f,
+            pivotX = 0.6f,
+            pivotY = 0.35f,
+            centerPivot = true,
+        )
+
+        val centered = transformedPivot(matrix, 0.6f, 0.35f)
+        assertEquals(0.12f, centered.first, 0.0001f)
+        assertEquals(-0.08f, centered.second, 0.0001f)
+    }
+
+    @Test
+    fun autoCenterDisabledPreservesExistingPivotPosition() {
+        val matrix = LiveEditorTransform.buildMatrix(
+            faceCenterX = 0.7f,
+            faceCenterY = 0.3f,
+            scale = 1f,
+            translateX = 0f,
+            translateY = 0f,
+            rotationDegrees = 0f,
+            mirrored = false,
+            pivotX = 0.6f,
+            pivotY = 0.35f,
+        )
+
+        val position = transformedPivot(matrix, 0.6f, 0.35f)
+        assertEquals(0.2f, position.first, 0.0001f)
+        assertEquals(0.3f, position.second, 0.0001f)
     }
 
     @Test

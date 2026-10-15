@@ -58,4 +58,23 @@ class CascadeTierSelectionTest {
         assertFalse(idx.isEmpty())
         assertEquals(0, idx.size % 3)
     }
+
+    @Test
+    fun faceBoxFallbackDoesNotClaimEyeLandmarksWereDetected() {
+        val face = LandmarkCascade.faceBoxOnly(0.62f, 0.48f)
+
+        assertTrue(face.detected)
+        assertFalse(face.eyeLandmarksDetected)
+        assertEquals(0.62f, face.faceCenterX)
+        assertEquals(0.48f, face.faceCenterY)
+    }
+
+    @Test
+    fun actualEyeLandmarksAreMarkedAsDetected() {
+        val face = FaceLandmarkAnalyzer.EyeLandmarks(
+            0.4f, 0.45f, 0.6f, 0.47f, detected = true,
+        )
+
+        assertTrue(face.eyeLandmarksDetected)
+    }
 }

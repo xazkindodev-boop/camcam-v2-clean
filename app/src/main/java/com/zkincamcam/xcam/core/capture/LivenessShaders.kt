@@ -24,11 +24,12 @@ internal object LivenessShaders {
         uniform float u_blink;
         uniform vec2 u_left_eye;
         uniform vec2 u_right_eye;
+        uniform float u_eye_landmarks_detected;
         varying vec2 v_texCoord;
 
         void main() {
             vec4 pos = a_position;
-            if (u_blink > 0.0) {
+            if (u_blink > 0.0 && u_eye_landmarks_detected > 0.5) {
                 // Blink deformation, nose-safe version. The old isotropic
                 // fixed-radius Gaussian shifted the nose along with the lids
                 // (the nose sits close to the eyes in texcoord space, closer
@@ -90,6 +91,7 @@ internal object LivenessShaders {
         uniform float u_pulse_intensity;
         uniform vec2 u_left_eye;
         uniform vec2 u_right_eye;
+        uniform float u_eye_landmarks_detected;
         uniform sampler2D u_mask;
         uniform float u_use_mask;
         uniform float u_beauty_theta;
@@ -120,7 +122,7 @@ internal object LivenessShaders {
         // locally flat skin (low variance) gets smoothed hard, textured/edge
         // regions (high variance) keep their detail. Layers:
         //  1. MASK-GATED: only the skin mask (u_mask) participates at all.
-        //  2. VARIANCE-GUIDED: kMin = (1 - var/(var+theta)) * skinProb * amount,
+        //  2. VARIANCE-GUIDED: luminance standard deviation controls smoothing,
         //     with skin probability from the red-channel relation used by GPUPixel.
         //  3. BILATERAL + LUMINANCE-ONLY: chroma never shifts.
         //  4. HIGH-PASS RESTORE: fine texture is added back (FabSoften-style
@@ -136,7 +138,9 @@ internal object LivenessShaders {
                 vec2 midFace = (u_left_eye + u_right_eye) * 0.5;
                 float d = distance(uv, midFace);
                 float faceZone = 1.0 - smoothstep(0.18, 0.45, d);
-                float eyeGuard = smoothstep(0.02, 0.06, min(distance(uv, u_left_eye), distance(uv, u_right_eye)));
+                float eyeGuard = u_eye_landmarks_detected > 0.5
+                    ? smoothstep(0.02, 0.06, min(distance(uv, u_left_eye), distance(uv, u_right_eye)))
+                    : 1.0;
                 gate = faceZone * eyeGuard;
             }
             if (gate <= 0.02) return color;
@@ -147,7 +151,8 @@ internal object LivenessShaders {
             // and in-place local variance (var = E[x^2] - E[x]^2, on luma).
             float w0 = 0.25;
             vec3 sum = centre * w0;
-            float sqSum = dot(centre, centre) * w0;
+            float centreLuma = dot(centre, vec3(0.299, 0.587, 0.114));
+            float sqSum = centreLuma * centreLuma * w0;
             float wsum = w0;
             for (int i = 0; i < 8; i++) {
                 float ang = float(i) * 0.785398; // 45° steps
@@ -155,17 +160,20 @@ internal object LivenessShaders {
                 vec3 s = texture2D(u_texture, uv + off).rgb;
                 float w = exp(-dot(s - centre, s - centre) * 24.0); // bilateral range weight
                 sum += s * w;
-                sqSum += dot(s, s) * w;
+                float sampleLuma = dot(s, vec3(0.299, 0.587, 0.114));
+                sqSum += sampleLuma * sampleLuma * w;
                 wsum += w;
             }
             vec3 mean = sum / wsum;
             vec3 smoothC = mean;
 
-            // Variance of local luma — flat skin ~0, pores/edges big.
+            // Luminance variance: E[Y²] - E[Y]². Comparing RGB energy with
+            // luma squared makes flat, naturally-colored skin look noisy.
             float meanLuma = dot(mean, vec3(0.299, 0.587, 0.114));
             float varLuma = max(sqSum / wsum - meanLuma * meanLuma, 0.0);
+            float lumaDeviation = sqrt(varLuma);
             float skinProb = clamp((min(centre.r, mean.r - 0.1) - 0.2) * 4.0, 0.0, 1.0);
-            float kMin = (1.0 - varLuma / (varLuma + u_beauty_theta)) * skinProb * u_beauty * gate;
+            float kMin = (u_beauty_theta / (lumaDeviation + u_beauty_theta)) * skinProb * u_beauty * gate;
             kMin = clamp(kMin, 0.0, u_smooth_ceiling);
 
             // Luminance-only transfer keeps hue/saturation of the skin exactly.
@@ -176,7 +184,7 @@ internal object LivenessShaders {
 
             // High-pass restore: add back a slice of the removed micro-texture.
             vec3 hPass = centre - mean;
-            result += hPass * u_restore_gain * (0.55 + 0.45 * (1.0 - u_beauty)) * gate;
+            result += hPass * u_restore_gain * (0.55 + 0.45 * (1.0 - u_beauty)) * kMin;
 
             // Subtle whitening: luminance lift, mask-gated, strength-limited.
             if (u_whiten > 0.0) {
@@ -189,6 +197,7 @@ internal object LivenessShaders {
 
         // --- 20MP CATCHLIGHT & IRIS ENHANCER ---
         vec3 enhanceEyeLiveliness(vec2 uv, vec3 currentRgb) {
+            if (u_eye_landmarks_detected < 0.5) return currentRgb;
             // u_catchlight_boost scales both iris deepen and catchlight strength.
             float dL = distance(uv, u_left_eye);
             float dR = distance(uv, u_right_eye);
@@ -227,7 +236,7 @@ internal object LivenessShaders {
             // (defocus contour), local-variance adaptive gain (soft patches
             // pushed, crisp ones left alone) and halo damping on strong edges.
             if (u_hd_level > 0.0) {
-                vec2 fr = vec2(r) * u_texel_size;
+                vec2 fr = vec2(u_hd_radius.x) * u_texel_size;
                 vec2 cr = u_hd_radius * u_texel_size;          // coarse radius (texels)
 
                 vec3 fineBlur = (
@@ -319,6 +328,7 @@ internal object LivenessUniforms {
     const val BLINK = "u_blink"
     const val LEFT_EYE = "u_left_eye"
     const val RIGHT_EYE = "u_right_eye"
+    const val EYES_DETECTED = "u_eye_landmarks_detected"
     const val MATRIX = "u_matrix"
     const val EXPOSURE = "u_exposure"
     const val CONTRAST = "u_contrast"

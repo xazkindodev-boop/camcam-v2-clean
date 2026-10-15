@@ -281,9 +281,13 @@ class MainActivity : AppCompatActivity(), XposedServiceHelper.OnServiceListener 
     /** Rotation/zoom anchor: the eye midpoint when landmarks exist, else frame centre. */
     private fun transformPivot(): Pair<Float, Float> {
         val lm = currentLandmarks
-        return if (lm.detected) {
+        return if (lm.eyeLandmarksDetected) {
             Pair((lm.leftEyeX + lm.rightEyeX) / 2f, (lm.leftEyeY + lm.rightEyeY) / 2f)
-        } else Pair(0.5f, 0.42f) // degraded guess: where portraits put eyes
+        } else if (lm.detected) {
+            Pair(lm.faceCenterX, lm.faceCenterY)
+        } else {
+            Pair(0.5f, 0.42f)
+        }
     }
 
     private fun updateTransformMatrix() {
@@ -297,9 +301,10 @@ class MainActivity : AppCompatActivity(), XposedServiceHelper.OnServiceListener 
                 translateY,
                 rotationAngle.toFloat() + sliderFineRotation.value,
                 isMirrored,
-                if (it.detected) it.faceRollDegrees else 0f,
+                if (it.eyeLandmarksDetected) it.faceRollDegrees else 0f,
                 pivotX = px,
-                pivotY = py
+                pivotY = py,
+                centerPivot = it.eyeLandmarksDetected
             )
         }
         liveRenderer.updateTransform(m)
@@ -772,9 +777,10 @@ class MainActivity : AppCompatActivity(), XposedServiceHelper.OnServiceListener 
                     translateY,
                     rotationAngle.toFloat() + sliderFineRotation.value,
                     isMirrored,
-                    if (currentLandmarks.detected) currentLandmarks.faceRollDegrees else 0f,
+                    if (currentLandmarks.eyeLandmarksDetected) currentLandmarks.faceRollDegrees else 0f,
                     pivotX = px,
-                    pivotY = py
+                    pivotY = py,
+                    centerPivot = currentLandmarks.eyeLandmarksDetected
                 )
                 com.zkincamcam.xcam.utils.MediaConverter.convertImageToMp4(
                     this, uri, stagingFile,

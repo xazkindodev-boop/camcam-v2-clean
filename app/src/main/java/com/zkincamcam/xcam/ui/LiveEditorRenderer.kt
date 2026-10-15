@@ -52,6 +52,7 @@ class LiveEditorRenderer : TextureView.SurfaceTextureListener {
     @Volatile private var transformMatrix = FloatArray(16).apply { Matrix.setIdentityM(this, 0) }
 
     fun updateSettings(b: Bitmap?, l: Bitmap?, a: MediaPreprocessor.ColorAdjustments, lm: FaceLandmarkAnalyzer.EyeLandmarks, liv: Boolean, noise: Float, pulse: Float, sharpness: Float, beauty: Float = 0f, preset: com.zkincamcam.xcam.core.capture.BeautyEnginePreset? = null, catchlight: Float? = null, hd: Float = 0f) {
+        if (liv && !isLiveness) startTime = System.currentTimeMillis()
         currentBitmap = b; currentLut = l; adj = a; landmarks = lm; isLiveness = liv; noiseIntensity = noise; pulseIntensity = pulse; this.sharpness = sharpness
         beautyIntensity = beauty
         if (preset != null) beautyPreset = preset
@@ -179,14 +180,20 @@ class LiveEditorRenderer : TextureView.SurfaceTextureListener {
 
         val posH = GLES20.glGetAttribLocation(programId, "a_position").also { GLES20.glEnableVertexAttribArray(it); GLES20.glVertexAttribPointer(it, 3, GLES20.GL_FLOAT, false, 0, vertexBuffer) }
         val texH = GLES20.glGetAttribLocation(programId, "a_texCoord").also { GLES20.glEnableVertexAttribArray(it); GLES20.glVertexAttribPointer(it, 2, GLES20.GL_FLOAT, false, 0, texCoordBuffer) }
-        GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(programId, LivenessUniforms.MATRIX), 1, false, transformMatrix, 0)
-        val t = (System.currentTimeMillis() - startTime) * 0.001f; val f0 = 0.9817477f
-        val blink = if (isLiveness && Math.sin(t.toDouble() * f0 * 3.0).toFloat() > 0.9f) (Math.sin(t.toDouble() * f0 * 3.0).toFloat() - 0.9f) * 10.0f else 0.0f
+        val t = (System.currentTimeMillis() - startTime) * 0.001
+        val animatedMatrix = com.zkincamcam.xcam.core.capture.LivenessAnimation.applyMotion(
+            transformMatrix,
+            t,
+            isLiveness,
+        )
+        GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(programId, LivenessUniforms.MATRIX), 1, false, animatedMatrix, 0)
+        val blink = com.zkincamcam.xcam.core.capture.LivenessAnimation.blinkAmount(t, isLiveness)
         
-        GLES20.glUniform1f(GLES20.glGetUniformLocation(programId, LivenessUniforms.TIME), t)
+        GLES20.glUniform1f(GLES20.glGetUniformLocation(programId, LivenessUniforms.TIME), t.toFloat())
         GLES20.glUniform1f(GLES20.glGetUniformLocation(programId, LivenessUniforms.BLINK), blink)
         GLES20.glUniform2f(GLES20.glGetUniformLocation(programId, LivenessUniforms.LEFT_EYE), landmarks.leftEyeX, 1f - landmarks.leftEyeY)
         GLES20.glUniform2f(GLES20.glGetUniformLocation(programId, LivenessUniforms.RIGHT_EYE), landmarks.rightEyeX, 1f - landmarks.rightEyeY)
+        GLES20.glUniform1f(GLES20.glGetUniformLocation(programId, LivenessUniforms.EYES_DETECTED), if (landmarks.eyeLandmarksDetected) 1f else 0f)
         GLES20.glUniform1f(GLES20.glGetUniformLocation(programId, LivenessUniforms.EXPOSURE), adj.exposure); GLES20.glUniform1f(GLES20.glGetUniformLocation(programId, LivenessUniforms.CONTRAST), adj.contrast)
         GLES20.glUniform1f(GLES20.glGetUniformLocation(programId, LivenessUniforms.HIGHLIGHTS), adj.highlights)
         GLES20.glUniform1f(GLES20.glGetUniformLocation(programId, LivenessUniforms.SHADOWS), adj.shadows)

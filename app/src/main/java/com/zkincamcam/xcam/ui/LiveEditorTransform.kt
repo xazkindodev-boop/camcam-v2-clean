@@ -14,7 +14,8 @@ internal object LiveEditorTransform {
         mirrored: Boolean,
         autoLevelDegrees: Float = 0f,
         pivotX: Float = faceCenterX,
-        pivotY: Float = faceCenterY
+        pivotY: Float = faceCenterY,
+        centerPivot: Boolean = false
     ): FloatArray {
         val radians = Math.toRadians((rotationDegrees + autoLevelDegrees).toDouble())
         val cos = cos(radians).toFloat()
@@ -23,14 +24,14 @@ internal object LiveEditorTransform {
         val scaleY = scale
         // X' = R*S*(X - C) + C + T, where C is the pivot in clip space.
         // Rotation AND zoom anchor at the pivot (the eye midpoint when face
-        // landmarks are available — the physiological neck axis). The pivot is
-        // a FIXED POINT: levelling a tilted photo (or zooming) leaves the eyes
-        // exactly where they were; the old formulation rotated about the face
-        // bbox centre, which shifted the head as a side effect. Defaulting the
-        // pivot to the face centre keeps the old behaviour for callers without
-        // landmarks.
+        // landmarks are available). With centerPivot enabled, alignment
+        // translates that fixed point to frame center before user translation;
+        // otherwise its source position is preserved. Defaulting the pivot to
+        // the face centre keeps the prior behavior for callers without landmarks.
         val centerX = pivotX * 2f - 1f
         val centerY = 1f - pivotY * 2f
+        val alignmentX = if (centerPivot) -centerX else 0f
+        val alignmentY = if (centerPivot) -centerY else 0f
 
         return FloatArray(16).apply {
             this[0] = cos * scaleX
@@ -38,8 +39,8 @@ internal object LiveEditorTransform {
             this[4] = -sin * scaleY
             this[5] = cos * scaleY
             this[10] = 1f
-            this[12] = centerX + translateX - (cos * scaleX * centerX - sin * scaleY * centerY)
-            this[13] = centerY + translateY - (sin * scaleX * centerX + cos * scaleY * centerY)
+            this[12] = centerX + translateX + alignmentX - (cos * scaleX * centerX - sin * scaleY * centerY)
+            this[13] = centerY + translateY + alignmentY - (sin * scaleX * centerX + cos * scaleY * centerY)
             this[15] = 1f
         }
     }

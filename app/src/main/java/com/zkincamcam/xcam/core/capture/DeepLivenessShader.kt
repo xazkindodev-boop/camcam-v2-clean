@@ -38,10 +38,11 @@ class DeepLivenessShader(
     val beautyPreset: BeautyEnginePreset = BeautyEnginePreset.DEFAULT,
     private val catchlightOverride: Float? = null,
     private val hdLevel: Float = 0f,
+    private val eyeMovementEnabled: Boolean = false,
 ) : GlEffect {
 
     override fun toGlShaderProgram(context: Context, useHighPrecisionColor: Boolean): GlShaderProgram {
-        return LivenessShaderProgram(landmarks, adj, lutBitmap, beautyLevel, externalMatrix, noiseLevel, pulseLevel, sharpnessLevel, beautyPreset, catchlightOverride, hdLevel)
+        return LivenessShaderProgram(landmarks, adj, lutBitmap, beautyLevel, externalMatrix, noiseLevel, pulseLevel, sharpnessLevel, beautyPreset, catchlightOverride, hdLevel, eyeMovementEnabled)
     }
 
     private class LivenessShaderProgram(
@@ -55,7 +56,8 @@ class DeepLivenessShader(
         private val sharpness: Float,
         val beautyPreset: BeautyEnginePreset = BeautyEnginePreset.DEFAULT,
         private val catchlightOverride: Float? = null,
-    private val hdLevel: Float = 0f,
+        private val hdLevel: Float = 0f,
+        private val eyeMovementEnabled: Boolean = false,
     ) : GlShaderProgram {
         private var errorListener: GlShaderProgram.ErrorListener? = null
         private var errorListenerExecutor: Executor? = null
@@ -184,13 +186,14 @@ class DeepLivenessShader(
                 GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, outputBuffers.framebufferId)
                 GLES20.glViewport(0, 0, outputBuffers.width, outputBuffers.height)
                 GLES20.glUseProgram(programId)
-                val t = presentationTimeUs * 0.000001f; val f0 = 0.9817477f
-                val blink = if (Math.sin(t.toDouble() * f0 * 3.0).toFloat() > 0.9f) (Math.sin(t.toDouble() * f0 * 3.0).toFloat() - 0.9f) * 10.0f else 0.0f
+                val t = presentationTimeUs * 0.000001f
+                val blink = LivenessAnimation.blinkAmount(t.toDouble(), eyeMovementEnabled)
                 // TIME convention: LivenessShaders.FRAGMENT expects SECONDS.
                 GLES20.glUniform1f(GLES20.glGetUniformLocation(programId, LivenessUniforms.TIME), t)
                 GLES20.glUniform1f(GLES20.glGetUniformLocation(programId, LivenessUniforms.BLINK), blink)
                 GLES20.glUniform2f(GLES20.glGetUniformLocation(programId, LivenessUniforms.LEFT_EYE), landmarks.leftEyeX, 1f - landmarks.leftEyeY)
                 GLES20.glUniform2f(GLES20.glGetUniformLocation(programId, LivenessUniforms.RIGHT_EYE), landmarks.rightEyeX, 1f - landmarks.rightEyeY)
+                GLES20.glUniform1f(GLES20.glGetUniformLocation(programId, LivenessUniforms.EYES_DETECTED), if (landmarks.eyeLandmarksDetected) 1f else 0f)
                 GLES20.glUniform1f(GLES20.glGetUniformLocation(programId, LivenessUniforms.EXPOSURE), adj.exposure); GLES20.glUniform1f(GLES20.glGetUniformLocation(programId, LivenessUniforms.CONTRAST), adj.contrast)
                 GLES20.glUniform1f(GLES20.glGetUniformLocation(programId, LivenessUniforms.HIGHLIGHTS), adj.highlights)
                 GLES20.glUniform1f(GLES20.glGetUniformLocation(programId, LivenessUniforms.SHADOWS), adj.shadows)
@@ -222,7 +225,8 @@ class DeepLivenessShader(
                     GLES20.glUniform1i(GLES20.glGetUniformLocation(programId, LivenessUniforms.MASK), 2)
                     GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
                 }
-                val finalMatrix = FloatArray(16); if (extMatrix != null) System.arraycopy(extMatrix, 0, finalMatrix, 0, 16) else Matrix.setIdentityM(finalMatrix, 0)
+                val baseMatrix = FloatArray(16); if (extMatrix != null) System.arraycopy(extMatrix, 0, baseMatrix, 0, 16) else Matrix.setIdentityM(baseMatrix, 0)
+                val finalMatrix = LivenessAnimation.applyMotion(baseMatrix, t.toDouble(), eyeMovementEnabled)
                 GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(programId, LivenessUniforms.MATRIX), 1, false, finalMatrix, 0)
                 GLES20.glActiveTexture(GLES20.GL_TEXTURE0); GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, inputTexture.texId)
                 val posH = GLES20.glGetAttribLocation(programId, "a_position").also { GLES20.glEnableVertexAttribArray(it); GLES20.glVertexAttribPointer(it, 3, GLES20.GL_FLOAT, false, 0, vertexBuffer) }
