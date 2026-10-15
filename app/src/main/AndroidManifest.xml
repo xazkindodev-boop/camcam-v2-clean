@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Package visibility: the module only needs to resolve launcher apps (to render the
+         LSPosed scope icon list). A targeted <queries> block replaces the previous blanket
+         QUERY_ALL_PACKAGES permission, which is a Play policy violation and over-broad. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="io.github.libxposed.IRemoteService" />
+        </intent>
+    </queries>
+
+    <application
+        android:name=".XCamApplication"
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.xCam">
+        <meta-data
+            android:name="xposedmodule"
+            android:value="true" />
+        <meta-data
+            android:name="xposeddescription"
+            android:value="Virtual Camera Injection for Images and Videos with Rotation and Mirroring support." />
+        <meta-data
+            android:name="xposedminversion"
+            android:value="101" />
+        <meta-data
+            android:name="xposedapi"
+            android:value="101" />
+
+        <provider
+            android:name="io.github.libxposed.service.XposedProvider"
+            android:authorities="com.zkincamcam.xcam.XposedService"
+            android:exported="true"
+            tools:ignore="ExportedContentProvider" />
+
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <provider
+            android:name=".data.SettingsProvider"
+            android:authorities="com.zkincamcam.xcam.provider"
+            android:exported="true"
+            android:permission="android.permission.ACCESS_MEDIA_LOCATION"
+            tools:ignore="ExportedContentProvider" />
+    </application>
+</manifest>
+
