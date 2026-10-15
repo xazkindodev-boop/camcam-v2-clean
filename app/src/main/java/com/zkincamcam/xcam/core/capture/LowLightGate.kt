@@ -80,10 +80,11 @@ object LandmarkConfidence {
         eyeDisplacement(a, b) < DRIFT_THRESHOLD
 
     fun pick(
-        a: FaceLandmarkAnalyzer.EyeLandmarks,
+        a: FaceLandmarkAnalyzer.EyeLandmarks?,
         b: FaceLandmarkAnalyzer.EyeLandmarks?,
         bPreprocessed: Boolean,
-    ): FaceLandmarkAnalyzer.EyeLandmarks {
+    ): FaceLandmarkAnalyzer.EyeLandmarks? {
+        if (a == null) return b
         if (b == null || !bPreprocessed) return a
         // mesh completeness outranks conditioning
         val aHasMesh = a.meshPoints != null && a.meshIndices != null

@@ -48,6 +48,38 @@ class LandmarkCascadeTest {
         assertNull(picked.meshIndices)
     }
 
+    @Test
+    fun softImageRetryCanRecoverMissedFace() {
+        val original = LandmarkCascade.degraded()
+        val retry = FaceLandmarkAnalyzer.EyeLandmarks(0.4f, 0.5f, 0.6f, 0.5f, true)
+
+        assertEquals(retry, LandmarkCascade.preferMoreCompleteDetection(original, retry))
+    }
+
+    @Test
+    fun softImageRetryPrefersMeshOverCoarseFaceDetection() {
+        val original = FaceLandmarkAnalyzer.EyeLandmarks(0.4f, 0.5f, 0.6f, 0.5f, true)
+        val retry = FaceLandmarkAnalyzer.EyeLandmarks(
+            0.4f,
+            0.5f,
+            0.6f,
+            0.5f,
+            true,
+            FloatArray(468 * 3),
+            intArrayOf(0, 1, 2),
+        )
+
+        assertEquals(retry, LandmarkCascade.preferMoreCompleteDetection(original, retry))
+    }
+
+    @Test
+    fun softImageRetryKeepsExistingDetectionWhenRetryIsNotBetter() {
+        val original = FaceLandmarkAnalyzer.EyeLandmarks(0.4f, 0.5f, 0.6f, 0.5f, true)
+        val retry = FaceLandmarkAnalyzer.EyeLandmarks(0.42f, 0.5f, 0.58f, 0.5f, true)
+
+        assertEquals(original, LandmarkCascade.preferMoreCompleteDetection(original, retry))
+    }
+
     private fun assertNull(x: FloatArray?) { org.junit.Assert.assertNull(x) }
     private fun assertNull(x: IntArray?) { org.junit.Assert.assertNull(x) }
 }

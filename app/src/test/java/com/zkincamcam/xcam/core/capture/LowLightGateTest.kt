@@ -90,6 +90,20 @@ class LowLightGateTest {
     }
 
     @Test
+    fun successfulPreprocessedPassIsUsedWhenInitialPassMisses() {
+        val boosted = FaceLandmarkAnalyzer.EyeLandmarks(
+            0.40f,
+            0.50f,
+            0.60f,
+            0.50f,
+            true,
+            FloatArray(468 * 3),
+            FaceMeshTopology.TRIANGLES.copyOf(),
+        )
+        assertEquals(boosted, LandmarkConfidence.pick(null, boosted, bPreprocessed = true))
+    }
+
+    @Test
     fun disagreementMetricSane() {
         // eye midpoint displacement metric: same points → 0
         val a = FaceLandmarkAnalyzer.EyeLandmarks(0.40f, 0.50f, 0.60f, 0.50f, true)

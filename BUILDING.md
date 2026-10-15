@@ -161,7 +161,7 @@ Output report: `app/build/reports/lint-results-debug.html`
 ```bash
 ./gradlew assembleDebug testDebugUnitTest lintDebug --no-daemon
 ```
-Baseline lokal setelah perbaikan: **189/189 unit test lulus** dan `lintDebug` selesai dengan **0 temuan**. Jalankan ulang gate di atas setelah perubahan karena hasil dapat berubah.
+Baseline setelah perbaikan deteksi soft-image: **197/197 unit test lulus** dan `lintDebug` selesai dengan **0 temuan**. Jalankan ulang gate di atas setelah perubahan karena hasil dapat berubah.
 
 ---
 

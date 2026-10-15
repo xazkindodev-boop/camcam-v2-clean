@@ -12,7 +12,7 @@ Risiko yang masih tersisa terutama ada pada integrasi kamera dan perilaku perang
 
 **Status validasi saat analisis:**
 
-- Setelah perbaikan source, `:app:testDebugUnitTest` berhasil: **189 tes lulus**.
+- Setelah perbaikan source, `:app:testDebugUnitTest` berhasil: **197 tes lulus**.
 - Setelah perbaikan source, `:app:assembleDebug` berhasil.
 - `:app:lintDebug` berhasil dijalankan dengan **0 temuan** setelah MediaPipe Tasks Vision dinaikkan ke 1.1.1.
 - `MediaRemuxerDeviceTest` berhasil pada Redmi Note 7/Android 13, termasuk audio/video melintasi batas loop; hook kamera, GPU shader, LSPosed, dan aplikasi target tetap belum diuji.
@@ -74,6 +74,8 @@ Hasil build dan tes tersebut menunjukkan source dapat dikompilasi dan tes unit y
 - `YuvFrameProcessor.flush()` memakai generation counter sehingga konversi lama yang selesai setelah pergantian media tidak diterbitkan sebagai frame baru. `CaptureManager` juga mengabaikan hasil stream extraction dari generation lama.
 - `core/capture/CaptureCache.kt`: cache JPEG kini dikaitkan ke media path dan di-invalidasi saat path berubah.
 - Jalur resize `YuvFrameProcessor` kini mendaur ulang bitmap hasil resize tambahan.
+- `FaceLandmarkAnalyzer` kini mengukur detail tepi pada thumbnail; bila foto tidak memiliki mesh dan dinilai soft, deteksi diulang pada salinan yang di-resize dan ditajamkan. Fallback ML Kit memakai mode akurat. Hasil pada foto buram nyata masih perlu diperiksa dengan sampel pengguna.
+- Jalur retry MediaPipe low-light juga diperbaiki: sebelumnya cabang yang berhasil melakukan boost memakai `plain!!` walau deteksi awal memang null, sehingga retry berakhir exception dan tidak pernah mengembalikan hasil boost.
 - Masih ada celah race yang sangat pendek apabila perubahan media terjadi bersamaan dengan penulisan frame yang sudah mengambil referensi frame untuk dipakai; ini perlu validasi di perangkat.
 
 ### Impor/ekspor media
@@ -86,8 +88,10 @@ Hasil build dan tes tersebut menunjukkan source dapat dikompilasi dan tes unit y
 - `ui/MainActivity.kt`: sudut rotasi dua jari kini dihitung dari koordinat kedua pointer, bukan dari span horizontal saja.
 - Crop state di-reset saat memilih media baru; crop yang telah diterapkan dapat dipulihkan lewat URI sumber saat undo/redo.
 - Analisis landmark memakai satu executor, task sebelumnya dibatalkan, dan hasil hanya diterapkan jika generation serta bitmap masih aktif.
+- Foto soft tanpa mesh memicu satu retry deteksi pada bitmap sementara yang ditajamkan; bitmap sumber yang ditampilkan/diekspor tidak diubah.
 - `ui/LiveEditorRenderer.kt`: texture LUT diunggah ulang saat bitmap LUT berubah dan dihapus saat LUT dilepas.
 - Snapshot undo/redo kini menyimpan translasi, catchlight, HD, preset beauty, LUT URI, crop fraction, dan rentang trim selain slider sebelumnya.
+- Deteksi foto buram menjalankan retry pada salinan sharpened jika tidak ada mesh; hasil awal tetap dipertahankan kecuali retry menemukan mesh lebih lengkap atau mendeteksi wajah yang sebelumnya terlewat. Belum tersedia foto buram representatif untuk mengukur recall/false positive secara nyata.
 - Impor media kini diekspor ke staging file, diverifikasi, lalu dipasang ke `filesDir`; media aktif yang lama dipertahankan sampai commit berhasil, dengan backup dan pemulihan pada jalur gagal.
 - Tes UI saat ini lebih banyak menguji logika murni seperti geometri crop, transform, gesture math, dan operasi stack history; belum menguji integrasi perubahan state pada Activity/renderer.
 
@@ -108,7 +112,7 @@ Hasil build dan tes tersebut menunjukkan source dapat dikompilasi dan tes unit y
 ### Dokumentasi dan klaim fitur
 
 - Klaim README tentang universalitas dan tingkat keberhasilan 100% telah diganti dengan catatan kompatibilitas yang bergantung pada aplikasi/OEM; status CameraX dan MediaRecorder dijelaskan eksplisit.
-- `BUILDING.md` memuat langkah membangun AAR FFmpegKitNext yang dibutuhkan clone bersih serta baseline 189 tes dan 0 temuan lint.
+- `BUILDING.md` memuat langkah membangun AAR FFmpegKitNext yang dibutuhkan clone bersih serta baseline 197 tes dan 0 temuan lint.
 - `app/build.gradle.kts` mendukung APK per-ABI opsional melalui `-PxcamAbiSplits=true`; universal APK dan konfigurasi build default tidak berubah.
 - Build split lokal menghasilkan APK universal sekitar 308 MB dan APK `arm64-v8a` sekitar 106 MB.
 - `FOUNDATION.md` berisi catatan lama mengenai password di `gradle.properties`. File `gradle.properties` yang diperiksa saat analisis tidak berisi password tersebut, sehingga catatan itu tampaknya sudah usang dan perlu diverifikasi sebelum diperlakukan sebagai kondisi aktual.

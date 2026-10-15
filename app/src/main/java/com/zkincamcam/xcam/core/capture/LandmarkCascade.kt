@@ -37,4 +37,17 @@ object LandmarkCascade {
             faceDetection.detected -> faceDetection
             else -> degraded()
         }
+
+    fun preferMoreCompleteDetection(
+        original: FaceLandmarkAnalyzer.EyeLandmarks,
+        retry: FaceLandmarkAnalyzer.EyeLandmarks,
+    ): FaceLandmarkAnalyzer.EyeLandmarks {
+        val originalHasMesh = original.meshPoints != null && original.meshIndices != null
+        val retryHasMesh = retry.meshPoints != null && retry.meshIndices != null
+        return if (retry.detected && (!original.detected || (!originalHasMesh && retryHasMesh))) {
+            retry
+        } else {
+            original
+        }
+    }
 }

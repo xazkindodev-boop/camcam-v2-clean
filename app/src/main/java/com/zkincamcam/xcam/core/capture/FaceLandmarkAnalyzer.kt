@@ -2,6 +2,7 @@ package com.zkincamcam.xcam.core.capture
 
 import android.graphics.Bitmap
 import android.util.Log
+import androidx.core.graphics.createBitmap
 import androidx.core.graphics.scale
 import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.vision.common.InputImage
@@ -15,6 +16,8 @@ import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarker
 import kotlin.math.atan2
+import kotlin.math.max
+import kotlin.math.roundToInt
 
 /**
  * Premium-Grade AI On-Device Computer Vision Landmark Extraction Engine.
@@ -79,8 +82,8 @@ object FaceLandmarkAnalyzer {
                     val boosted = brightenForDetection(bitmap, gain)
                     val retry = detect(boosted)
                     Log.d(TAG, "tier0 lowlight retry (gain=$gain): ${if (retry != null) "OK" else "no face"} in ${System.currentTimeMillis() - t0}ms")
-                    if (retry == null) null else LandmarkConfidence.pick(plain!!, retry, bPreprocessed = true)
-                        .takeIf { it.detected }
+                    LandmarkConfidence.pick(plain, retry, bPreprocessed = true)
+                        .takeIf { it?.detected == true }
                 }
             }
         } catch (e: Throwable) {
@@ -188,6 +191,24 @@ object FaceLandmarkAnalyzer {
     }
 
     fun analyze(bitmap: Bitmap): EyeLandmarks {
+        val originalResult = analyzeOnBitmap(bitmap)
+        val originalHasMesh = originalResult.meshPoints != null && originalResult.meshIndices != null
+        if (originalHasMesh || !isSoftForLandmarks(bitmap)) return originalResult
+
+        val retryBitmap = createSharpenedDetectionBitmap(bitmap) ?: return originalResult
+        return try {
+            val retryResult = analyzeOnBitmap(retryBitmap)
+            val selected = LandmarkCascade.preferMoreCompleteDetection(originalResult, retryResult)
+            if (selected !== originalResult) {
+                Log.d(TAG, "soft-image retry improved landmark detection")
+            }
+            selected
+        } finally {
+            if (retryBitmap !== bitmap) retryBitmap.recycle()
+        }
+    }
+
+    private fun analyzeOnBitmap(bitmap: Bitmap): EyeLandmarks {
         analyzeWithMediaPipe(bitmap)?.let { return it }
         val options = FaceMeshDetectorOptions.Builder()
             .setUseCase(FaceMeshDetectorOptions.FACE_MESH)
@@ -271,7 +292,7 @@ object FaceLandmarkAnalyzer {
         val t0 = System.currentTimeMillis()
         return try {
             val options = FaceDetectorOptions.Builder()
-                .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
+                .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
                 .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
                 .build()
             val faceDetector = FaceDetection.getClient(options)
@@ -318,5 +339,57 @@ object FaceLandmarkAnalyzer {
             Log.w(TAG, "tier2 face-detect error: ${e.message} -> tier3 degraded")
             LandmarkCascade.degraded()
         }
+    }
+
+    private fun isSoftForLandmarks(bitmap: Bitmap): Boolean = try {
+        val maxDimension = 128
+        val scale = maxDimension.toFloat() / max(bitmap.width, bitmap.height)
+        val width = max(3, (bitmap.width * scale).roundToInt())
+        val height = max(3, (bitmap.height * scale).roundToInt())
+        val sample = bitmap.scale(width, height)
+        try {
+            val pixels = IntArray(width * height)
+            sample.getPixels(pixels, 0, width, 0, 0, width, height)
+            val grayscale = IntArray(pixels.size) { index ->
+                val pixel = pixels[index]
+                ((0.299f * ((pixel shr 16) and 0xFF)) +
+                    (0.587f * ((pixel shr 8) and 0xFF)) +
+                    (0.114f * (pixel and 0xFF))).roundToInt()
+            }
+            LandmarkImageQuality.needsSharpening(
+                LandmarkImageQuality.meanLaplacianMagnitude(grayscale, width, height),
+            )
+        } finally {
+            if (sample !== bitmap) sample.recycle()
+        }
+    } catch (e: Exception) {
+        Log.w(TAG, "image sharpness probe failed: ${e.message}")
+        false
+    }
+
+    private fun createSharpenedDetectionBitmap(bitmap: Bitmap): Bitmap? = try {
+        val maxDimension = 1280
+        val scale = minOf(1f, maxDimension.toFloat() / max(bitmap.width, bitmap.height))
+        val width = max(3, (bitmap.width * scale).roundToInt())
+        val height = max(3, (bitmap.height * scale).roundToInt())
+        val resized = bitmap.scale(width, height)
+        try {
+            val pixels = IntArray(width * height)
+            resized.getPixels(pixels, 0, width, 0, 0, width, height)
+            val sharpenedPixels = MediaPreprocessor.sharpenArgbPixels(
+                pixels,
+                width,
+                height,
+                weight = 2.5f,
+            )
+            createBitmap(width, height, Bitmap.Config.ARGB_8888).also {
+                it.setPixels(sharpenedPixels, 0, width, 0, 0, width, height)
+            }
+        } finally {
+            if (resized !== bitmap) resized.recycle()
+        }
+    } catch (e: Exception) {
+        Log.w(TAG, "soft-image preprocessing failed: ${e.message}")
+        null
     }
 }
