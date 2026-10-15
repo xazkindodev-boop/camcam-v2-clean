@@ -38,7 +38,7 @@ jobs:
           V_CODE=$(git tag | wc -l)
           ./gradlew assembleRelease -PAPP_VERSION_CODE=$V_CODE -PAPP_VERSION_NAME=$V_NAME
         env:
-          RELEASE_STORE_FILE: release-key.jks
+          RELEASE_STORE_FILE: app/release-key.jks
           RELEASE_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}

@@ -107,6 +107,9 @@ RELEASE_KEY_PASSWORD=***
 
 Keystore release disimpan terpisah dari repository dan tidak disertakan. Tanpa mengatur
 keystore serta variabel signing di atas, `assembleRelease` tidak dapat ditandatangani.
+Untuk GitHub Actions, workflow mengharapkan repository secrets `SIGNING_KEY` (isi JKS
+yang di-base64), `KEY_STORE_PASSWORD`, `ALIAS`, dan `KEY_PASSWORD`. File hasil decode
+berada di `app/release-key.jks`; jangan commit JKS maupun password ke repository.
 
 ### Generate keystore baru (kalau belum ada)
 ```bash
